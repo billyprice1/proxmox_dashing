@@ -69,36 +69,40 @@ def is_port_open?(ip, port)
 end
 
 def get_config
-  config_file = File.dirname(File.expand_path(__FILE__)) + '/../../shared/proxmox_dashing/config.yml'
-  config = YAML::load(File.open(config_file))['config_data']
-  config['bad_nodes']  = {}
-  config['good_nodes'] = []
+  #config_file = File.dirname(File.expand_path(__FILE__)) + '/../../shared/proxmox_dashing/config.yml'
+  config_file = '/tmp/config.yml'
+  config = YAML::load(File.open(config_file))
+  config.each_key do |cluster|
+    config[cluster]['bad_nodes']  = {}
+    config[cluster]['good_nodes'] = []
+  end
   return config
 end
 
-def classify_nodes(config)
-  config['proxmox_hosts'].each do |host|
-    if is_port_open?(host,config['port'])
-      uri       = "https://#{host}:#{config['port']}/api2/json/"
-      post_param = { username: config['username'], realm: config['realm'], password: config['password'] }
+def classify_nodes(config,cluster)
+  p "CLUSTER HOSTS #{config[cluster]['proxmox_hosts']}"
+  config[cluster]['proxmox_hosts'].each do |host|
+    if is_port_open?(host,config[cluster]['port'])
+      uri       = "https://#{host}:#{config[cluster]['port']}/api2/json/"
+      post_param = { username: config[cluster]['username'], realm: config[cluster]['realm'], password: config[cluster]['password'] }
       begin
         site = RestClient::Resource.new(uri, :verify_ssl => false, open_timeout: 3)
         site['access/ticket'].post post_param do |response, request, result, &block|
           if response.code == 200
-            config['bad_nodes'].delete(host) if config['bad_nodes'].include?(host)
-            config['good_nodes'] << host unless config['good_nodes'].include?(host)
+            config[cluster]['bad_nodes'].delete(host) if config[cluster]['bad_nodes'].include?(host)
+            config[cluster]['good_nodes'] << host unless config[cluster]['good_nodes'].include?(host)
           else
-            config['good_nodes'].delete(host) if config['good_nodes'].include?(host)
-            config['bad_nodes'][host] = "cannot authenticate"
+            config[cluster]['good_nodes'].delete(host) if config[cluster]['good_nodes'].include?(host)
+            config[cluster]['bad_nodes'][host] = "cannot authenticate"
           end
         end
       rescue Exception
-        config['good_nodes'].delete(host) if config['good_nodes'].include?(host)
-        config['bad_nodes'][host] = "cannot authenticate"
+        config[cluster]['good_nodes'].delete(host) if config[cluster]['good_nodes'].include?(host)
+        config[cluster]['bad_nodes'][host] = "cannot authenticate"
       end
     else
-      config['good_nodes'].delete(host) if config['good_nodes'].include?(host)
-        config['bad_nodes'][host] = "not listening"
+      config[cluster]['good_nodes'].delete(host) if config[cluster]['good_nodes'].include?(host)
+        config[cluster]['bad_nodes'][host] = "not listening"
     end
     config
   end
@@ -179,8 +183,8 @@ def extract_ticket(response)
   }
 end
 
-def create_ticket(config,site)
-  post_param = { username: config['username'], realm: config['realm'], password: config['password'] }
+def create_ticket(cluster,site)
+  post_param = { username: cluster['username'], realm: cluster['realm'], password: cluster['password'] }
   begin
     site['access/ticket'].post post_param do |response, request, result, &block|
       if response.code == 200
@@ -196,23 +200,26 @@ end
 
 conf=get_config()
 SCHEDULER.every '20s' do
-  classify_nodes(conf)
-  report_total_failure if conf['good_nodes'].empty?
-  hostname = conf['good_nodes'].shuffle.first
-  uri = "https://#{hostname}:#{conf['port']}/api2/json/"
-  site = RestClient::Resource.new(uri, :verify_ssl => false)
-  auth_params = create_ticket(conf,site)
-  #populate data from random good node
-  rows = []
-  conf['good_nodes'].each do |node|
-    shortnodename = node.split('.')[0]
-    rows << {"cols"=> [{"value" => shortnodename} ,{"value" => get_node_kernel(shortnodename,site,auth_params)}] }
+  conf.each_key do |key|
+    cluster = key
+    classify_nodes(conf,cluster)
+    report_total_failure if conf['good_nodes'].empty?
+    hostname = conf['good_nodes'].shuffle.first
+    uri = "https://#{hostname}:#{conf['port']}/api2/json/"
+    site = RestClient::Resource.new(uri, :verify_ssl => false)
+    auth_params = create_ticket(conf,site)
+    #populate data from random good node
+    rows = []
+    conf['good_nodes'].each do |node|
+      shortnodename = node.split('.')[0]
+      rows << {"cols"=> [{"value" => shortnodename} ,{"value" => get_node_kernel(shortnodename,site,auth_params)}] }
+    end
+    conf['bad_nodes'].each do |k, v|
+      shortnodename = k.split('.')[0]
+      rows << {"cols"=> [{"value" => shortnodename} ,{"value" => v }] }
+    end
+    send_event('hosts_and_kernels', { rows: rows } )
+    # Checking cluster status
+    report_cluster_status(site,auth_params)
   end
-  conf['bad_nodes'].each do |k, v|
-    shortnodename = k.split('.')[0]
-    rows << {"cols"=> [{"value" => shortnodename} ,{"value" => v }] }
-  end
-  send_event('hosts_and_kernels', { rows: rows } )
-  # Checking cluster status
-  report_cluster_status(site,auth_params)
 end
