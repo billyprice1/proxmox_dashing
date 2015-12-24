@@ -108,12 +108,12 @@ def classify_nodes(config,cluster)
   end
 end
 
-def report_cluster_status(site,auth_params)
+def report_cluster_status(cluster,site,auth_params)
   cluster_status = get_data(site,auth_params)
 	nodes = []
   nodes = cluster_status.select { |a| a['type'] == 'node'}
 
-  norgmanagerlist = select_hosts(nodes,'rgmanager',0)
+  norgmanagerlist = select_hosts(nodes,"#{cluster}_rgmanager",0)
   downhostlist = select_hosts(nodes, 'state',0)
   nopmxcfshostlist = select_hosts(nodes, 'pmxcfs',0)
 
@@ -121,18 +121,18 @@ def report_cluster_status(site,auth_params)
   down_ha_hosts = ha_hosts_array.select { |a| a['state'] != '112' }
   down_ha_host_ids = down_ha_hosts.map { |x| x["name"] }
 
-  send_event('pvecluster', { state: 'critical', message: "Too many nodes not running pvecluster: #{nopmxcfshostlist.join(", ")}" } ) if nopmxcfshostlist.size >= 2
+  send_event("#{cluster}_pvecluster", { state: 'critical', message: "Too many nodes not running pvecluster: #{nopmxcfshostlist.join(", ")}" } ) if nopmxcfshostlist.size >= 2
   if nopmxcfshostlist.empty?
-    send_event('pvecluster', { state: 'ok', message: 'Cluster has quorum' } )
+    send_event("#{cluster}_pvecluster", { state: 'ok', message: 'Cluster has quorum' } )
   else
-    send_event('pvecluster', { state: 'warning', message: "PVECluster not running on:\n #{nopmxcfshostlist.join(", ")}"} )
+    send_event("#{cluster}_pvecluster", { state: 'warning', message: "PVECluster not running on:\n #{nopmxcfshostlist.join(", ")}"} )
   end
 
-  send_event('corosync', { state: 'critical', message: 'Cluster lost quorum', status:'Critical' } ) unless have_quorum(cluster_status)
+  send_event("#{cluster}_corosync", { state: 'critical', message: 'Cluster lost quorum', status:'Critical' } ) unless have_quorum(cluster_status)
   if downhostlist.empty?
-    send_event('corosync', { state: 'ok', message: "Corosync up on all hosts"} )
+    send_event("#{cluster}_corosync", { state: 'ok', message: "Corosync up on all hosts"} )
   else
-    send_event('corosync', { state: 'warning', message: "Node(s) not running: \n #{downhostlist.join(", ")}" } )
+    send_event("#{cluster}_corosync", { state: 'warning', message: "Node(s) not running: \n #{downhostlist.join(", ")}" } )
   end
   unless norgmanagerlist.empty?
     if nodes.count.to_f/2 > norgmanagerlist.count.to_f
@@ -140,23 +140,23 @@ def report_cluster_status(site,auth_params)
     else
       state_level = "critical"
     end
-    send_event('rgmanager', { state: state_level, message: "Node(s) not running RG Manager: \n #{norgmanagerlist.join(", ")}" } )
+    send_event("#{cluster}_rgmanager", { state: state_level, message: "Node(s) not running RG Manager: \n #{norgmanagerlist.join(", ")}" } )
   else
-    send_event('rgmanager', { state: 'ok', message: 'RGmanager is healthy' } )
+    send_event("#{cluster}_rgmanager", { state: 'ok', message: 'RGmanager is healthy' } )
   end
 
   unless down_ha_host_ids.empty?
-    send_event('haservers', { state: 'critical', message: "HA servers down: \n #{down_ha_host_ids.join(", ")}" } )
+    send_event("#{cluster}_haservers", { state: 'critical', message: "HA servers down: \n #{down_ha_host_ids.join(", ")}" } )
   else
-    send_event('haservers', { state: 'ok', message: 'All HA servers are running' } )
+    send_event("#{cluster}_haservers", { state: 'ok', message: 'All HA servers are running' } )
   end
 end
 
 def report_total_failure
-  send_event('pvecluster', { state: 'critical', message: "KVM cluster unreachable" } )
-  send_event('corosync', { state: 'critical', message: "KVM cluster unreachable"} )
-  send_event('rgmanager', { state: 'critical', message: "KVM cluster unreachable" } )
-  send_event('haservers', { state: 'critical', message: "KVM cluster unreachable" })
+  send_event("#{cluster}_pvecluster", { state: 'critical', message: "KVM cluster unreachable" } )
+  send_event("#{cluster}_corosync", { state: 'critical', message: "KVM cluster unreachable"} )
+  send_event("#{cluster}_rgmanager", { state: 'critical', message: "KVM cluster unreachable" } )
+  send_event("#{cluster}_haservers", { state: 'critical', message: "KVM cluster unreachable" })
 end
 
 def bad_nodes_report(conf)
@@ -208,21 +208,18 @@ SCHEDULER.every '5s' do
     uri = "https://#{hostname}:#{conf[cluster]['port']}/api2/json/"
     site = RestClient::Resource.new(uri, :verify_ssl => false)
     auth_params = create_ticket(conf[cluster],site)
-    p "Auth params: #{auth_params}"
     #populate data from random good node
     rows = []
     conf[cluster]['good_nodes'].each do |node|
-      p "Good nodes: #{node}"
       shortnodename = node.split('.')[0]
       rows << {"cols"=> [{"value" => shortnodename} ,{"value" => get_node_kernel(shortnodename,site,auth_params)}] }
     end
     conf[cluster]['bad_nodes'].each do |k, v|
-      p "Bad nodes: #{node}"
       shortnodename = k.split('.')[0]
       rows << {"cols"=> [{"value" => shortnodename} ,{"value" => v }] }
     end
-    send_event('hosts_and_kernels', { rows: rows } )
+    send_event("#{cluster}_hosts_and_kernels", { rows: rows } )
     # Checking cluster status
-    report_cluster_status(site,auth_params)
+    report_cluster_status(cluster,site,auth_params)
   end
 end
