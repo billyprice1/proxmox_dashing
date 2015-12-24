@@ -19,6 +19,7 @@ def get_data(site,auth_params)
 end
 
 def extract_ticket(response)
+  p " Response: #{response}"
   data = JSON.parse(response.body)
   ticket = data['data']['ticket']
   csrf_prevention_token = data['data']['CSRFPreventionToken']
@@ -80,7 +81,6 @@ def get_config
 end
 
 def classify_nodes(config,cluster)
-  p "CLUSTER HOSTS #{config[cluster]['proxmox_hosts']}"
   config[cluster]['proxmox_hosts'].each do |host|
     if is_port_open?(host,config[cluster]['port'])
       uri       = "https://#{host}:#{config[cluster]['port']}/api2/json/"
@@ -102,7 +102,7 @@ def classify_nodes(config,cluster)
       end
     else
       config[cluster]['good_nodes'].delete(host) if config[cluster]['good_nodes'].include?(host)
-        config[cluster]['bad_nodes'][host] = "not listening"
+      config[cluster]['bad_nodes'][host] = "not listening"
     end
     config
   end
@@ -199,22 +199,25 @@ def create_ticket(cluster,site)
 end
 
 conf=get_config()
-SCHEDULER.every '20s' do
+SCHEDULER.every '5s' do
   conf.each_key do |key|
     cluster = key
     classify_nodes(conf,cluster)
-    report_total_failure if conf['good_nodes'].empty?
-    hostname = conf['good_nodes'].shuffle.first
-    uri = "https://#{hostname}:#{conf['port']}/api2/json/"
+    report_total_failure if conf[cluster]['good_nodes'].empty?
+    hostname = conf[cluster]['good_nodes'].shuffle.first
+    uri = "https://#{hostname}:#{conf[cluster]['port']}/api2/json/"
     site = RestClient::Resource.new(uri, :verify_ssl => false)
-    auth_params = create_ticket(conf,site)
+    auth_params = create_ticket(conf[cluster],site)
+    p "Auth params: #{auth_params}"
     #populate data from random good node
     rows = []
-    conf['good_nodes'].each do |node|
+    conf[cluster]['good_nodes'].each do |node|
+      p "Good nodes: #{node}"
       shortnodename = node.split('.')[0]
       rows << {"cols"=> [{"value" => shortnodename} ,{"value" => get_node_kernel(shortnodename,site,auth_params)}] }
     end
-    conf['bad_nodes'].each do |k, v|
+    conf[cluster]['bad_nodes'].each do |k, v|
+      p "Bad nodes: #{node}"
       shortnodename = k.split('.')[0]
       rows << {"cols"=> [{"value" => shortnodename} ,{"value" => v }] }
     end
