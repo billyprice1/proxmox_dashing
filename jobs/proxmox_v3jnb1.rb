@@ -4,8 +4,6 @@ require 'socket'
 require 'timeout'
 require 'yaml'
 
-set :kvm_rows, []
-
 def get_node_kernel(node,site,auth_params)
   site["nodes/#{node}/status"].get auth_params do |response, request, result, &block|
     JSON.parse(response.body)['data']['kversion'].split[1]
