@@ -68,8 +68,7 @@ def is_port_open?(ip, port)
 end
 
 def get_config
-  #config_file = File.dirname(File.expand_path(__FILE__)) + '/../../shared/proxmox_dashing/config.yml'
-  config_file = '/tmp/config_v3jnb1.yml'
+  config_file = File.dirname(File.expand_path(__FILE__)) + '/../../shared/proxmox_dashing/config_v3jnb1.yml'
   config = YAML::load(File.open(config_file))['config_data']
   config['bad_nodes']  = {}
   config['good_nodes'] = []
