@@ -146,6 +146,8 @@ GEM
       rack-test
       sinatra (~> 1.4.0)
       tilt (>= 1.3, < 3)
+    sinatra_cyclist (0.0.3)
+      sinatra
     sprockets (2.10.2)
       hike (~> 1.2)
       multi_json (~> 1.0)
@@ -181,6 +183,7 @@ DEPENDENCIES
   dashing-contrib (~> 0.2.1)
   execjs
   rest-client
+  sinatra_cyclist
   therubyracer
 
 BUNDLED WITH

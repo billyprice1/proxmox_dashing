@@ -33,8 +33,7 @@ def extract_ticket(response)
 end
 
 def have_quorum(status)
-  quorum_line = status.find { |a| a['type'] == 'quorum'}
-  quorate = quorum_line['quorate'].to_i
+  quorate = status[0]['quorate']
   if quorate == 0
     false
   else
@@ -69,7 +68,8 @@ def is_port_open?(ip, port)
 end
 
 def get_config
-  config_file = File.dirname(File.expand_path(__FILE__)) + '/../../shared/proxmox_dashing/config.yml'
+  #config_file = File.dirname(File.expand_path(__FILE__)) + '/../../shared/proxmox_dashing/config.yml'
+  config_file = '/tmp/config_v3jnb1.yml'
   config = YAML::load(File.open(config_file))['config_data']
   config['bad_nodes']  = {}
   config['good_nodes'] = []
@@ -117,18 +117,18 @@ def report_cluster_status(site,auth_params)
   down_ha_hosts = ha_hosts_array.select { |a| a['state'] != '112' }
   down_ha_host_ids = down_ha_hosts.map { |x| x["name"] }
 
-  send_event('pvecluster', { state: 'critical', message: "Too many nodes not running pvecluster: #{nopmxcfshostlist.join(", ")}" } ) if nopmxcfshostlist.size >= 2
+  send_event('v3jnb1_pvecluster', { state: 'critical', message: "Too many nodes not running pvecluster: #{nopmxcfshostlist.join(", ")}" } ) if nopmxcfshostlist.size >= 2
   if nopmxcfshostlist.empty?
-    send_event('pvecluster', { state: 'ok', message: 'Cluster has quorum' } )
+    send_event('v3jnb1_pvecluster', { state: 'ok', message: 'Cluster has quorum' } )
   else
-    send_event('pvecluster', { state: 'warning', message: "PVECluster not running on:\n #{nopmxcfshostlist.join(", ")}"} )
+    send_event('v3jnb1_pvecluster', { state: 'warning', message: "PVECluster not running on:\n #{nopmxcfshostlist.join(", ")}"} )
   end
 
-  send_event('corosync', { state: 'critical', message: 'Cluster lost quorum', status:'Critical' } ) unless have_quorum(cluster_status)
+  send_event('v3jnb1_corosync', { state: 'critical', message: 'Cluster lost quorum', status:'Critical' } ) unless have_quorum(cluster_status)
   if downhostlist.empty?
-    send_event('corosync', { state: 'ok', message: "Corosync up on all hosts"} )
+    send_event('v3jnb1_corosync', { state: 'ok', message: "Corosync up on all hosts"} )
   else
-    send_event('corosync', { state: 'warning', message: "Node(s) not running: \n #{downhostlist.join(", ")}" } )
+    send_event('v3jnb1_corosync', { state: 'warning', message: "Node(s) not running: \n #{downhostlist.join(", ")}" } )
   end
   unless norgmanagerlist.empty?
     if nodes.count.to_f/2 > norgmanagerlist.count.to_f
@@ -136,23 +136,23 @@ def report_cluster_status(site,auth_params)
     else
       state_level = "critical"
     end
-    send_event('rgmanager', { state: state_level, message: "Node(s) not running RG Manager: \n #{norgmanagerlist.join(", ")}" } )
+    send_event('v3jnb1_rgmanager', { state: state_level, message: "Node(s) not running RG Manager: \n #{norgmanagerlist.join(", ")}" } )
   else
-    send_event('rgmanager', { state: 'ok', message: 'RGmanager is healthy' } )
+    send_event('v3jnb1_rgmanager', { state: 'ok', message: 'RGmanager is healthy' } )
   end
 
   unless down_ha_host_ids.empty?
-    send_event('haservers', { state: 'critical', message: "HA servers down: \n #{down_ha_host_ids.join(", ")}" } )
+    send_event('v3jnb1_haservers', { state: 'critical', message: "HA servers down: \n #{down_ha_host_ids.join(", ")}" } )
   else
-    send_event('haservers', { state: 'ok', message: 'All HA servers are running' } )
+    send_event('v3jnb1_haservers', { state: 'ok', message: 'All HA servers are running' } )
   end
 end
 
 def report_total_failure
-  send_event('pvecluster', { state: 'critical', message: "KVM cluster unreachable" } )
-  send_event('corosync', { state: 'critical', message: "KVM cluster unreachable"} )
-  send_event('rgmanager', { state: 'critical', message: "KVM cluster unreachable" } )
-  send_event('haservers', { state: 'critical', message: "KVM cluster unreachable" })
+  send_event('v3jnb1_pvecluster', { state: 'critical', message: "KVM cluster unreachable" } )
+  send_event('v3jnb1_corosync', { state: 'critical', message: "KVM cluster unreachable"} )
+  send_event('v3jnb1_rgmanager', { state: 'critical', message: "KVM cluster unreachable" } )
+  send_event('v3jnb1_haservers', { state: 'critical', message: "KVM cluster unreachable" })
 end
 
 def bad_nodes_report(conf)
@@ -212,7 +212,7 @@ SCHEDULER.every '20s' do
     shortnodename = k.split('.')[0]
     rows << {"cols"=> [{"value" => shortnodename} ,{"value" => v }] }
   end
-  send_event('hosts_and_kernels', { rows: rows } )
+  send_event('v3jnb1_hosts_and_kernels', { rows: rows } )
   # Checking cluster status
   report_cluster_status(site,auth_params)
 end

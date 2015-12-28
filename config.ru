@@ -1,6 +1,8 @@
 $: << File.expand_path('./lib', File.dirname(__FILE__))
+require 'sinatra/cyclist'
 require 'dashing-contrib'
 require 'dashing'
+
 DashingContrib.configure
 
 configure do
@@ -17,5 +19,7 @@ end
 map Sinatra::Application.assets_prefix do
   run Sinatra::Application.sprockets
 end
+
+set :routes_to_cycle_through, [:proxmox_v3jnb1, :proxmox_v0cpt3]
 
 run Sinatra::Application
