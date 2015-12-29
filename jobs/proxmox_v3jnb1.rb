@@ -101,7 +101,7 @@ def classify_nodes(config)
   end
 end
 
-def report_cluster_status(site,auth_params)
+def report_cluster_state(site,auth_params)
   cluster_status = get_data(site,auth_params)
 	nodes = []
   nodes = cluster_status.select { |a| a['type'] == 'node'}
@@ -192,7 +192,7 @@ def create_ticket(config,site)
 end
 
 conf=get_config()
-SCHEDULER.every '20s' do
+SCHEDULER.every '20s', :first_in => 0 do |job|
   classify_nodes(conf)
   report_total_failure if conf['good_nodes'].empty?
   hostname = conf['good_nodes'].shuffle.first
@@ -211,5 +211,5 @@ SCHEDULER.every '20s' do
   end
   send_event('v3jnb1_hosts_and_kernels', { rows: rows } )
   # Checking cluster status
-  report_cluster_status(site,auth_params)
+  report_cluster_state(site,auth_params)
 end
