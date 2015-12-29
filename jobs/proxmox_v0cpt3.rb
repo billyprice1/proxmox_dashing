@@ -112,22 +112,13 @@ def report_cluster_status(site,auth_params)
   ha_status = get_ha_data(site,auth_params)
 	nodes = []
   nodes = cluster_status.select { |a| a['type'] == 'node'}
+  downhostlist = select_hosts(nodes, 'online',0)
 
-  downhostlist = select_hosts(nodes, 'state',0)
-  nopmxcfshostlist = select_hosts(nodes, 'pmxcfs',0)
-
-  send_event('v0cpt3_pvecluster', { state: 'critical', message: "Too many nodes not running pvecluster: #{nopmxcfshostlist.join(", ")}" } ) if nopmxcfshostlist.size >= 2
-  if nopmxcfshostlist.empty?
-    send_event('v0cpt3_pvecluster', { state: 'ok', message: 'Cluster has quorum' } )
-  else
-    send_event('v0cpt3_pvecluster', { state: 'warning', message: "PVECluster not running on:\n #{nopmxcfshostlist.join(", ")}"} )
-  end
-
-  send_event('v0cpt3_corosync', { state: 'critical', message: 'Cluster lost quorum', status:'Critical' } ) unless have_quorum(cluster_status)
+  send_event('v0cpt3_pvecluster', { state: 'critical', message: "Cluster lost quorum!" } ) if cluster_status[0]['quorate'] != 1
   if downhostlist.empty?
-    send_event('v0cpt3_corosync', { state: 'ok', message: "Corosync up on all hosts"} )
+    send_event('v0cpt3_pvecluster', { state: 'ok', message: 'Cluster has quorum and all hosts up' } )
   else
-    send_event('v0cpt3_corosync', { state: 'warning', message: "Node(s) not running: \n #{downhostlist.join(", ")}" } )
+    send_event('v0cpt3_pvecluster', { state: 'warning', message: "Host(s) not up:\n #{downhostlist.join(", ")}"} )
   end
 
   unless ha_status[0]['status'] == "OK"
@@ -139,7 +130,6 @@ end
 
 def report_total_failure
   send_event('v0cpt3_pvecluster', { state: 'critical', message: "KVM cluster unreachable" } )
-  send_event('v0cpt3_corosync', { state: 'critical', message: "KVM cluster unreachable"} )
   send_event('v0cpt3_haservers', { state: 'critical', message: "KVM cluster unreachable" })
 end
 
@@ -183,7 +173,7 @@ def create_ticket(config,site)
 end
 
 conf=get_config()
-SCHEDULER.every '20s' do
+SCHEDULER.every '5s' do
   classify_nodes(conf)
   report_total_failure if conf['good_nodes'].empty?
   hostname = conf['good_nodes'].shuffle.first
@@ -201,6 +191,5 @@ SCHEDULER.every '20s' do
     rows << {"cols"=> [{"value" => shortnodename} ,{"value" => v }] }
   end
   send_event('v0cpt3_hosts_and_kernels', { rows: rows } )
-  # Checking cluster status
   report_cluster_status(site,auth_params)
 end
