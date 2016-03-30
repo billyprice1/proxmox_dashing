@@ -1,0 +1,15 @@
+<% content_for :title do %>Proxmox v0jnb1 Cluster Health<% end %>
+<div class="gridster">
+  <ul>
+    <li data-row="1" data-col="1" data-sizex="1" data-sizey="1">
+        <div data-id="v0jnb1_pvecluster" data-view="HotState" data-criticalsound="/critical.mp3" data-title="PVE Cluster Health" data-text=". state will show here ."></div>
+    </li>
+    <li data-row="1" data-col="1" data-sizex="1" data-sizey="1">
+        <div data-id="v0jnb1_haservers" data-view="HotState" data-criticalsound="/critical.mp3" data-title="HA Servers State" data-text=". state will show here ."></div>
+    </li>
+    <li data-row="1" data-col="2" data-sizex="2" data-sizey="1">
+        <div data-id="v0jnb1_hosts_and_kernels" data-view="Table" data-criticalsound="/critical.mp3" data-title="KVM Hosts" data-text=". state will show here ."></div>
+    </li>
+  </ul>
+</div>
+
