@@ -20,6 +20,6 @@ map Sinatra::Application.assets_prefix do
   run Sinatra::Application.sprockets
 end
 
-set :routes_to_cycle_through, [:proxmox_v3jnb1, :proxmox_v0cpt3, :proxmox_v0jnb1]
+set :routes_to_cycle_through, [:proxmox_v0cpt3, :proxmox_v0jnb1]
 
 run Sinatra::Application
